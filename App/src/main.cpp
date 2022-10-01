@@ -10,9 +10,18 @@ extern "C" {
 #include <opencv2/core/utility.hpp>
 #include <chrono>
 #include <string>
+#include <thread>
+
+void capture( cv::VideoCapture &cap, cv::Mat &frame, bool &ready )
+{
+	frame.release();
+	cap.read(frame);
+	ready = true;
+}
 
 int main(int argc, char** argv)
 {	
+	bool ready = true, ask_cap = false;
 	cv::Mat frame;
 	cv::Mat framegray;
 	std::vector<std::vector<cv::Point>> array_contours;
@@ -63,9 +72,13 @@ int main(int argc, char** argv)
 		starttime = std::chrono::high_resolution_clock::now();
 		duration = starttime - now;
 
-		cv::cvtColor(frame, framegray, cv::COLOR_BGR2GRAY);
-		image.data = (void*)(framegray.data);
-		UpdateTexture( texture, image.data );
+		if (ready) {
+			// TraceLog(LOG_INFO, "Update image data");
+			cv::cvtColor(frame, framegray, cv::COLOR_BGR2GRAY);
+			image.data = (void*)(framegray.data);
+			UpdateTexture( texture, image.data );
+			ask_cap = true;
+		}
 
 		BeginDrawing();
 		ClearBackground(RAYWHITE);
@@ -81,9 +94,16 @@ int main(int argc, char** argv)
 
 		EndDrawing();
 		
-		frame.release();
-		cap.read(frame);
-		if (frame.empty()) break;
+		// frame.release();
+		// cap.read(frame);
+		// if (frame.empty()) break;
+		if (ready && ask_cap) {
+			// TraceLog(LOG_INFO, "Thread done new frame ready");
+			ready = false;
+			ask_cap = false;
+			std::thread t_cv( capture, std::ref(cap), std::ref(frame), std::ref(ready) );
+			t_cv.detach();
+		}
 	}
 
 	UnloadTexture(texture);
