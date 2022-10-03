@@ -1,12 +1,11 @@
-extern "C" { 
-	#include "raylib.h"
-}
+#include "raylib.h"
+#include "raygui.h"
 
 #include <stdio.h>
 #include <iostream>
-#include "opencv2/imgcodecs.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/imgproc.hpp"
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/core/utility.hpp>
 #include <chrono>
 #include <string>

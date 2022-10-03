@@ -5,5 +5,5 @@ file(
 
 add_executable(App ${APP_SRC})
 
-target_include_directories( App PRIVATE ${OpenCV_INCLUDE_DIRS} )
-target_link_libraries( App ${OpenCV_LIBS} raylib )
+target_include_directories( App PUBLIC ${OpenCV_INCLUDE_DIRS} )
+target_link_libraries( App ${OpenCV_LIBS} raylib raygui )
