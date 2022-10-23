@@ -7,20 +7,68 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/utility.hpp>
-#include <chrono>
 #include <string>
 #include <thread>
 
 void capture( cv::VideoCapture &cap, cv::Mat &frame, bool &ready )
 {
 	frame.release();
+	cap.grab();
 	cap.read(frame);
 	ready = true;
+}
+
+Rectangle RectangleAdd(Rectangle &a, Rectangle &b)
+{
+	Rectangle res;
+
+	res.x = a.x + b.x;
+	res.y = a.y + b.y;
+	res.width = a.width + b.width;
+	res.height = a.height + b.height;
+
+	return res;
+}
+
+Rectangle RectangleMove(Rectangle &a, Rectangle &b)
+{
+	Rectangle res;
+
+	res.x = a.x + b.x;
+	res.y = a.y + b.y;
+	res.width = a.width;
+	res.height = a.height;
+
+	return a;
+}
+
+struct imgAVG {
+	float avg;
+	int count;
+};
+
+imgAVG average(Image &img, Rectangle &rec)
+{
+	float avg=0;
+	int count = 0;
+	int i=rec.x, im = i + rec.width,
+		j=rec.y, jm = j + rec.height;
+
+	for ( ; j<jm ; ++j ) {
+		i=rec.x;
+		for ( ; i<im ; ++i ) {
+			avg += GetImageColor( img, i, j ).r;
+			++count;
+		}
+	}
+
+	return {avg/count, count};
 }
 
 int main(int argc, char** argv)
 {	
 	bool ready = true, ask_cap = false;
+
 	cv::Mat frame;
 	cv::Mat framegray;
 	std::vector<std::vector<cv::Point>> array_contours;
@@ -38,6 +86,9 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
+
+	cap.grab();
 	cap.read(frame);
 
 	screenWidth = frame.cols;
@@ -58,51 +109,63 @@ int main(int argc, char** argv)
 
 	SetTraceLogLevel(LOG_ALL);
 	
-	cap.set(cv::CAP_PROP_FPS, 5.0);
-
 	TraceLog(LOG_INFO, "camera size: [%d, %d]", screenWidth, screenHeight);
 	TraceLog(LOG_INFO, "camera fps: %.2f", cap.get( cv::CAP_PROP_FPS ) );
 	
-	std::chrono::system_clock::time_point starttime, now = std::chrono::high_resolution_clock::now();
+	Rectangle source = {0, 0, (float)screenWidth, (float)screenHeight};
+	Rectangle dest = {10,10, 320, 240};
+	Rectangle zone = { (float)screenWidth/2.0f - 10, (float)screenHeight/2.0f - 10 ,20,20};
+
+	const int CAPTURE_FPS_MIN = 1;
+	const int CAPTURE_FPS_MAX = cap.get(cv::CAP_PROP_FPS);
+
+	float CAPTURE_FPS = CAPTURE_FPS_MAX;
+	float capture_time = 0.0f;
+	imgAVG avg = {0};
 
 	while (!WindowShouldClose())
 	{
-		std::chrono::duration<float> duration;
-		starttime = std::chrono::high_resolution_clock::now();
-		duration = starttime - now;
 
 		if (ready) {
-			// TraceLog(LOG_INFO, "Update image data");
 			cv::cvtColor(frame, framegray, cv::COLOR_BGR2GRAY);
 			image.data = (void*)(framegray.data);
+			ready = false;
+			ask_cap = false;
+
+			avg = average(image, zone);
+
+			ImageDrawRectangleLines( &image, zone, 2, WHITE );
 			UpdateTexture( texture, image.data );
-			ask_cap = true;
 		}
 
 		BeginDrawing();
 		ClearBackground(RAYWHITE);
 
-		DrawTexture(texture, 0, 0, WHITE);
-		DrawText(std::to_string(1.0/duration.count()).c_str(), 10, 50, 5, RAYWHITE);
-		DrawFPS( 10, 10 );
+		DrawTexturePro(texture, source, dest, {}, 0.0, WHITE);
 
-		now = std::chrono::high_resolution_clock::now();
-		duration = now - starttime;
+		DrawText(std::to_string((int)CAPTURE_FPS).c_str(), 50, 250, 5, GRAY);
+		DrawText(std::to_string(capture_time).c_str(), 50, 260, 5, GRAY);
+		DrawText(std::to_string(1.0/CAPTURE_FPS).c_str(), 50, 270, 5, GRAY);
 
-		DrawText(std::to_string(1.0/duration.count()).c_str(), 10, 30, 5, RAYWHITE);
+		DrawText(std::to_string(avg.avg).c_str(), 50, 300, 10, RED);
 
-		EndDrawing();
-		
-		// frame.release();
-		// cap.read(frame);
-		// if (frame.empty()) break;
-		if (ready && ask_cap) {
-			// TraceLog(LOG_INFO, "Thread done new frame ready");
-			ready = false;
-			ask_cap = false;
+		CAPTURE_FPS = GuiSliderBar( {50,280,90,10}, "MIN", "MAX", 
+			CAPTURE_FPS, 
+			CAPTURE_FPS_MIN, 
+			CAPTURE_FPS_MAX 
+		);
+
+		if ( capture_time >= 1./CAPTURE_FPS && !ask_cap) {
 			std::thread t_cv( capture, std::ref(cap), std::ref(frame), std::ref(ready) );
 			t_cv.detach();
+			ask_cap = true;
+			capture_time = 0;
 		}
+
+		DrawFPS( 10, 10 );
+
+		EndDrawing();
+		capture_time += GetFrameTime();
 	}
 
 	UnloadTexture(texture);
