@@ -10,37 +10,10 @@
 #include <string>
 #include <thread>
 
-void capture( cv::VideoCapture &cap, cv::Mat &frame, bool &ready )
-{
-	frame.release();
-	cap.grab();
-	cap.read(frame);
-	ready = true;
-}
+bool DONE = false;
 
-Rectangle RectangleAdd(Rectangle &a, Rectangle &b)
-{
-	Rectangle res;
-
-	res.x = a.x + b.x;
-	res.y = a.y + b.y;
-	res.width = a.width + b.width;
-	res.height = a.height + b.height;
-
-	return res;
-}
-
-Rectangle RectangleMove(Rectangle &a, Rectangle &b)
-{
-	Rectangle res;
-
-	res.x = a.x + b.x;
-	res.y = a.y + b.y;
-	res.width = a.width;
-	res.height = a.height;
-
-	return a;
-}
+void grab( cv::VideoCapture &cap );
+void capture( cv::VideoCapture &cap, cv::Mat &frame, bool &ready );
 
 struct imgAVG {
 	float avg;
@@ -88,8 +61,9 @@ int main(int argc, char** argv)
 
 	cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
-	cap.grab();
 	cap.read(frame);
+
+	std::thread grb(grab, std::ref(cap));
 
 	screenWidth = frame.cols;
 	screenHeight = frame.rows;
@@ -121,39 +95,67 @@ int main(int argc, char** argv)
 
 	float CAPTURE_FPS = CAPTURE_FPS_MAX;
 	float capture_time = 0.0f;
+	float second = 0;
+	int framecount = 0;
 	imgAVG avg = {0};
+	int actualFps = 0;
+
+	RenderTexture2D video_render = LoadRenderTexture( 320, 240 );
 
 	while (!WindowShouldClose())
 	{
-
 		if (ready) {
+			++framecount;
 			cv::cvtColor(frame, framegray, cv::COLOR_BGR2GRAY);
 			image.data = (void*)(framegray.data);
 			ready = false;
 			ask_cap = false;
 
 			avg = average(image, zone);
-
-			ImageDrawRectangleLines( &image, zone, 2, WHITE );
+			ImageDrawRectangleLines( &image, zone, 1, WHITE );
 			UpdateTexture( texture, image.data );
 		}
+
+		BeginTextureMode( video_render );
+		ClearBackground(BLACK);
+		
+		DrawTextureRec( texture, {0,0, (float)screenWidth, (float)-screenHeight}, {-320/2, -240/2} , WHITE );
+
+		EndTextureMode();
 
 		BeginDrawing();
 		ClearBackground(RAYWHITE);
 
-		DrawTexturePro(texture, source, dest, {}, 0.0, WHITE);
+		DrawTexture( video_render.texture, 10, 10, WHITE );
+		//DrawTexturePro(texture, source, dest, {}, 0.0, WHITE);
 
 		DrawText(std::to_string((int)CAPTURE_FPS).c_str(), 50, 250, 5, GRAY);
 		DrawText(std::to_string(capture_time).c_str(), 50, 260, 5, GRAY);
 		DrawText(std::to_string(1.0/CAPTURE_FPS).c_str(), 50, 270, 5, GRAY);
 
 		DrawText(std::to_string(avg.avg).c_str(), 50, 300, 10, RED);
+		DrawText(std::to_string(actualFps).c_str(), 50, 320, 10, BLUE);
+		DrawText(std::to_string(GetTime()).c_str(), 50, 330, 5, GRAY);
 
 		CAPTURE_FPS = GuiSliderBar( {50,280,90,10}, "MIN", "MAX", 
-			CAPTURE_FPS, 
-			CAPTURE_FPS_MIN, 
-			CAPTURE_FPS_MAX 
+			CAPTURE_FPS,
+			CAPTURE_FPS_MIN,
+			CAPTURE_FPS_MAX
 		);
+
+		DrawFPS( 10, 10 );
+
+		// draw UI frame
+		DrawLine( 5,5,5,screenHeight-5, BLACK );
+		DrawLine( 5,5,screenWidth-5,5, BLACK );
+		DrawLine( screenWidth-5,screenHeight-5,screenWidth-5,5, BLACK );
+		DrawLine( screenWidth-5,screenHeight-5,5,screenHeight-5, BLACK );
+
+		DrawLine( 335,5,335,screenHeight-5, BLACK );
+		DrawLine( 5,255,335,255, BLACK );
+
+
+		EndDrawing();
 
 		if ( capture_time >= 1./CAPTURE_FPS && !ask_cap) {
 			std::thread t_cv( capture, std::ref(cap), std::ref(frame), std::ref(ready) );
@@ -162,12 +164,20 @@ int main(int argc, char** argv)
 			capture_time = 0;
 		}
 
-		DrawFPS( 10, 10 );
+		if ( second >= 1.0f ) {
+			actualFps = framecount;
+			second = 0.0f;
+			framecount = 0;
+		}
 
-		EndDrawing();
 		capture_time += GetFrameTime();
+		second += GetFrameTime();
 	}
 
+	DONE = true;
+	grb.join();
+
+	UnloadRenderTexture(video_render);
 	UnloadTexture(texture);
 	cap.release();
 	CloseWindow();
