@@ -1,5 +1,6 @@
 #include "raylib.h"
 #include "raygui.h"
+#include "rlgl.h"
 
 #include <stdio.h>
 #include <iostream>
@@ -9,6 +10,7 @@
 #include <opencv2/core/utility.hpp>
 #include <string>
 #include <thread>
+#include <list>
 
 bool DONE = false;
 
@@ -18,11 +20,12 @@ void capture( cv::VideoCapture &cap, cv::Mat &frame, bool &ready );
 struct imgAVG {
 	float avg;
 	int count;
+	double time;
 };
 
 imgAVG average(Image &img, Rectangle &rec)
 {
-	float avg=0;
+	float sum=0;
 	int count = 0;
 	int i=rec.x, im = i + rec.width,
 		j=rec.y, jm = j + rec.height;
@@ -30,17 +33,19 @@ imgAVG average(Image &img, Rectangle &rec)
 	for ( ; j<jm ; ++j ) {
 		i=rec.x;
 		for ( ; i<im ; ++i ) {
-			avg += GetImageColor( img, i, j ).r;
+			sum += GetImageColor( img, i, j ).r;
 			++count;
 		}
 	}
 
-	return {avg/count, count};
+	return {((sum/count))/255, count,  GetTime()};
 }
 
 int main(int argc, char** argv)
 {	
 	bool ready = true, ask_cap = false;
+
+	std::list< imgAVG > colect;
 
 	cv::Mat frame;
 	cv::Mat framegray;
@@ -101,6 +106,7 @@ int main(int argc, char** argv)
 	int actualFps = 0;
 
 	RenderTexture2D video_render = LoadRenderTexture( 320, 240 );
+	RenderTexture2D graph_render = LoadRenderTexture( 320, 210 );
 
 	while (!WindowShouldClose())
 	{
@@ -112,6 +118,11 @@ int main(int argc, char** argv)
 			ask_cap = false;
 
 			avg = average(image, zone);
+
+			colect.push_back( avg );
+
+			if ( colect.size() >= 500000 ) colect.pop_front();
+
 			ImageDrawRectangleLines( &image, zone, 1, WHITE );
 			UpdateTexture( texture, image.data );
 		}
@@ -123,11 +134,30 @@ int main(int argc, char** argv)
 
 		EndTextureMode();
 
+		BeginTextureMode( graph_render );
+		ClearBackground(WHITE);
+
+		rlBegin( RL_LINES );
+
+		rlColor3f( 0,0,0 );
+
+		imgAVG prev = {0,0,0};
+		for ( auto i : colect ) {
+			rlVertex2f(prev.time*10, prev.avg*100);
+			rlVertex2f( i.time*10, i.avg*100 );
+
+			prev = i;
+		}
+
+		rlEnd();
+
+		EndTextureMode();
+
 		BeginDrawing();
 		ClearBackground(RAYWHITE);
 
 		DrawTexture( video_render.texture, 10, 10, WHITE );
-		//DrawTexturePro(texture, source, dest, {}, 0.0, WHITE);
+		DrawTextureRec( graph_render.texture, {0,0,320,-210},{10, 260}, WHITE );
 
 		DrawText(std::to_string((int)CAPTURE_FPS).c_str(), 50, 250, 5, GRAY);
 		DrawText(std::to_string(capture_time).c_str(), 50, 260, 5, GRAY);
@@ -154,7 +184,6 @@ int main(int argc, char** argv)
 		DrawLine( 335,5,335,screenHeight-5, BLACK );
 		DrawLine( 5,255,335,255, BLACK );
 
-
 		EndDrawing();
 
 		if ( capture_time >= 1./CAPTURE_FPS && !ask_cap) {
@@ -178,6 +207,7 @@ int main(int argc, char** argv)
 	grb.join();
 
 	UnloadRenderTexture(video_render);
+	UnloadRenderTexture(graph_render);
 	UnloadTexture(texture);
 	cap.release();
 	CloseWindow();
