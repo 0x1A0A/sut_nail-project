@@ -243,7 +243,7 @@ int main(int argc, char** argv)
 			std::to_string(1.0/CAPTURE_FPS)).c_str(), 350, 30, 10, GRAY);
 		DrawText( ("ACTUAL FRAMRATE "+
 			std::to_string(actualFps)).c_str(), 350, 45, 10, BLUE);
-		DrawText( "TIME LIMIT : ", 350, 60, 10, BLUE);
+		DrawText( "TIME LIMIT : ", 350, 60, 10, GRAY);
 		if (GuiTextBox( {350+160,60,40,10}, activate_limit_in, 20, activate_limit_box_activate ) && !activate) {
 			activate_limit_box_activate = !activate_limit_box_activate;
 
