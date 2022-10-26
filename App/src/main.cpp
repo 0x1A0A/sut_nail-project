@@ -13,6 +13,7 @@
 #include <list>
 
 bool DONE = false;
+double activate_time = 0.f;
 
 void grab( cv::VideoCapture &cap );
 void capture( cv::VideoCapture &cap, cv::Mat &frame, bool &ready );
@@ -38,7 +39,7 @@ imgAVG average(Image &img, Rectangle &rec)
 		}
 	}
 
-	return {((sum/count))/255, count,  GetTime()};
+	return {((sum/count))/255, count,  GetTime() - activate_time};
 }
 
 int main(int argc, char** argv)
@@ -98,7 +99,7 @@ int main(int argc, char** argv)
 	const int CAPTURE_FPS_MIN = 1;
 	const int CAPTURE_FPS_MAX = cap.get(cv::CAP_PROP_FPS);
 
-	float CAPTURE_FPS = CAPTURE_FPS_MAX;
+	float CAPTURE_FPS = CAPTURE_FPS_MAX/2;
 	float capture_time = 0.0f;
 	float second = 0;
 	int framecount = 0;
@@ -107,6 +108,18 @@ int main(int argc, char** argv)
 
 	RenderTexture2D video_render = LoadRenderTexture( 320, 240 );
 	RenderTexture2D graph_render = LoadRenderTexture( 320, 210 );
+
+	Camera2D camera = {0};
+	camera.zoom = 1.0f;
+	camera.offset = {320,0};
+	camera.target = {320,0};
+
+	bool activate = false;
+
+	float activate_limit_sec = 0;
+
+	char activate_limit_in[100] = "0";
+	bool activate_limit_box_activate = false;
 
 	while (!WindowShouldClose())
 	{
@@ -119,6 +132,7 @@ int main(int argc, char** argv)
 
 			avg = average(image, zone);
 
+			if (activate)
 			colect.push_back( avg );
 
 			if ( colect.size() >= 500000 ) colect.pop_front();
@@ -135,21 +149,48 @@ int main(int argc, char** argv)
 		EndTextureMode();
 
 		BeginTextureMode( graph_render );
-		ClearBackground(WHITE);
 
-		rlBegin( RL_LINES );
+		BeginMode2D( camera );
 
-		rlColor3f( 0,0,0 );
+		ClearBackground(RAYWHITE);
 
-		imgAVG prev = {0,0,0};
-		for ( auto i : colect ) {
-			rlVertex2f(prev.time*10, prev.avg*100);
-			rlVertex2f( i.time*10, i.avg*100 );
+		{
+			Vector2 pos = {10,200};
 
-			prev = i;
+			const float scale = 50;
+			const float height = 190;
+			float last = colect.back().time;
+			last = last*scale > 310 ? last*scale:310;
+
+			camera.target.x = last + 10;
+			// vertical line
+			DrawLine( pos.x, pos.y, pos.x, pos.y - height, GRAY );
+			// horizontal line
+			DrawLine( pos.x, pos.y, last , pos.y, GRAY );
+
+			rlBegin( RL_LINES );
+
+			rlColor3f( 0,0,0 );
+
+			if ( colect.size() ) {
+				imgAVG prev = {0,0,0};
+				for ( auto i : colect ) {
+					rlVertex2f(prev.time*scale + pos.x, pos.y - prev.avg*height);
+					rlVertex2f( i.time*scale + pos.x, pos.y - i.avg*height);
+
+					prev = i;
+				}
+			}
+
+			rlEnd();
+			// for ( auto i : colect )
+			// DrawLine( i.time*scale + pos.x, pos.y - i.avg*height - 5,
+			// 	i.time*scale + pos.x, pos.y - i.avg*height + 5,
+			// 	RED
+			// );
 		}
 
-		rlEnd();
+		EndMode2D();
 
 		EndTextureMode();
 
@@ -159,21 +200,8 @@ int main(int argc, char** argv)
 		DrawTexture( video_render.texture, 10, 10, WHITE );
 		DrawTextureRec( graph_render.texture, {0,0,320,-210},{10, 260}, WHITE );
 
-		DrawText(std::to_string((int)CAPTURE_FPS).c_str(), 50, 250, 5, GRAY);
-		DrawText(std::to_string(capture_time).c_str(), 50, 260, 5, GRAY);
-		DrawText(std::to_string(1.0/CAPTURE_FPS).c_str(), 50, 270, 5, GRAY);
-
-		DrawText(std::to_string(avg.avg).c_str(), 50, 300, 10, RED);
-		DrawText(std::to_string(actualFps).c_str(), 50, 320, 10, BLUE);
-		DrawText(std::to_string(GetTime()).c_str(), 50, 330, 5, GRAY);
-
-		CAPTURE_FPS = GuiSliderBar( {50,280,90,10}, "MIN", "MAX", 
-			CAPTURE_FPS,
-			CAPTURE_FPS_MIN,
-			CAPTURE_FPS_MAX
-		);
-
-		DrawFPS( 10, 10 );
+		// this is app fps
+		DrawFPS( 15, 15 );
 
 		// draw UI frame
 		DrawLine( 5,5,5,screenHeight-5, BLACK );
@@ -183,6 +211,46 @@ int main(int argc, char** argv)
 
 		DrawLine( 335,5,335,screenHeight-5, BLACK );
 		DrawLine( 5,255,335,255, BLACK );
+
+		// draw control
+		{
+			char buff[50];
+
+			sprintf(buff, "DESIRED FRAMERATE : %3d", (int)CAPTURE_FPS);
+			DrawText( buff, 350, 15, 10, GRAY);
+		
+
+			CAPTURE_FPS = GuiSliderBar( {350+160,15,90,10}, NULL, NULL, 
+				CAPTURE_FPS,
+				CAPTURE_FPS_MIN,
+				CAPTURE_FPS_MAX
+			);
+		}
+
+		if (GuiButton( { 340+5, (float)screenHeight-10-30, 290-10, 20 }, activate ? "STOP":"START")) {
+			if (!activate) colect.clear();
+		
+			activate_time = GetTime();
+			activate = !activate;
+		}
+
+		if ( activate_limit_sec != 0 && GetTime() - activate_time >= activate_limit_sec ) {
+			activate = false;
+			activate_time = GetTime();
+		}
+		
+		DrawText( ("INTERVAL : "+
+			std::to_string(1.0/CAPTURE_FPS)).c_str(), 350, 30, 10, GRAY);
+		DrawText( ("ACTUAL FRAMRATE "+
+			std::to_string(actualFps)).c_str(), 350, 45, 10, BLUE);
+		DrawText( "TIME LIMIT : ", 350, 60, 10, BLUE);
+		if (GuiTextBox( {350+160,60,40,10}, activate_limit_in, 20, activate_limit_box_activate ) && !activate) {
+			activate_limit_box_activate = !activate_limit_box_activate;
+
+			activate_limit_sec = (float)std::atof( activate_limit_in );
+
+			// TraceLog(LOG_INFO,"set time limit to : %f", activate_limit_sec);
+		}
 
 		EndDrawing();
 
@@ -198,7 +266,7 @@ int main(int argc, char** argv)
 			second = 0.0f;
 			framecount = 0;
 		}
-
+		
 		capture_time += GetFrameTime();
 		second += GetFrameTime();
 	}
