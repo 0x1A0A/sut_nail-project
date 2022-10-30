@@ -91,13 +91,16 @@ public:
 			t_cv.detach();
 			m_wait = true;
 			m_time = 0.f;
-		} else m_time += GetFrameTime();
+		}
 
 		if ( second >= 1.0f ) {
 			actual_fps = framecount;
 			framecount = 0;
 			second = 0;
-		} else second += GetFrameTime();
+		}
+		
+		m_time += GetFrameTime();
+		second += GetFrameTime();
 	}
 
 	void draw() const { m_canvas.draw(); }

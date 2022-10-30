@@ -18,7 +18,7 @@ int main(int argc, char** argv)
 	int screenHeight = 480;
 
 	InitWindow(screenWidth, screenHeight, "raylib opencv test2: camera");
-	SetTargetFPS(60);
+	//SetTargetFPS(60);
 
 	SetTraceLogLevel(LOG_ALL);
 	{
