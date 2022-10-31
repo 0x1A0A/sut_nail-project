@@ -19,7 +19,8 @@ public:
 	inline void setPos( const Vector2 pos ) { m_pos = pos; }
 
 	inline Vector2 getPos() const { return m_pos; }
-
+	inline Rectangle getRect() const { return m_rect; } 
+	inline Vector2 getSize() const { return {m_rect.width, -m_rect.height}; }
 	inline bool mouseIn() const { 
 		return CheckCollisionPointRec( 
 			{(float)GetMouseX(),(float)GetMouseY()},

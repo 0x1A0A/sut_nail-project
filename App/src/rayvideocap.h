@@ -113,6 +113,10 @@ public:
 		UnloadTexture(m_texture);
 		cap.release();
 	}
+	
+	inline Vector2 getPos() const {return m_canvas.getPos();};
+	inline Vector2 getSize() const {return m_canvas.getSize();};
+
 
 private:
 	Canvas2d m_canvas;
