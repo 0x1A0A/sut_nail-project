@@ -18,7 +18,7 @@ public:
 	inline rlGrpah(Vector2 size, Vector2 pos = {0,0})
 		: m_canvas( size, pos )
 	{
-		m_camera = {.offset={320,0},.zoom=1.f};
+		m_camera = {{320,0},{0,0},0,1.f};
 		activate_time = 0.f;
 		autoscroll = true;
 		activate = measure = slide = slidem = false;
