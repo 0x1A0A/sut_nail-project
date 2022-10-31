@@ -21,7 +21,7 @@ public:
 		m_camera = {.offset={320,0},.zoom=1.f};
 		activate_time = 0.f;
 		autoscroll = true;
-		activate = measure = slide = false;
+		activate = measure = slide = slidem = false;
 		ms[0] =  ms[1] = 10;
 	}
 
@@ -65,8 +65,9 @@ public:
 		const float cmin = m_camera.offset.x;
 		const float scale = 100;
 		const float height = 150;
-		const float cmax = collect.back().time*scale;
+		const float cmax = collect.size() == 0 ? 0 : collect.back().time*scale;
 		const float last = cmax < cmin ? cmin : cmax+10;
+
 		Vector2 mpos = GetScreenToWorld2D(
 			Vector2Subtract( GetMousePosition(), m_canvas.getPos() ),
 			m_camera
@@ -86,12 +87,21 @@ public:
 
 			if ( slide ) {
 				m_camera.target.x = old_camera_x + ( mouse_m_x - mpos.x );
+				m_camera.target.x = Clamp( m_camera.target.x, cmin, last );
 			}
 
-			m_camera.target.x = Clamp( m_camera.target.x, cmin, last );
+			if ( slidem ) {
+				if ( ms[1] > m_camera.target.x) {
+					m_camera.target.x = ms[1];
+				} else if (ms[1] < m_camera.target.x-m_camera.offset.x) {
+					m_camera.target.x -= (m_camera.target.x-m_camera.offset.x) - ms[1] ;
+				}
+					m_camera.target.x = Clamp( m_camera.target.x, cmin, last );
+			}
+
 		}
 
-		if ( measure && IsMouseButtonReleased( MOUSE_BUTTON_LEFT ) ) measure = false;
+		if ( measure && IsMouseButtonReleased( MOUSE_BUTTON_LEFT ) ) measure = slidem = false;
 
 		if ( measure ) {
 			ms[1] = mpos.x;
@@ -106,14 +116,19 @@ public:
 			);
 			char buff[100];
 			sprintf(buff, "%.2f s", (abs( ms[1] - ms[0] )/scale));
-			DrawText( buff, sm, pos.y -170, 10, BLACK );
+			
+			float tg = m_camera.target.x + 10 - m_camera.offset.x;
+
+			DrawText( buff,
+				sm > tg ? sm : tg,
+				pos.y -170, 10, BLACK );
 		}
 
 		if (mouseIn()) {
 
 			if ( IsMouseButtonDown( MOUSE_BUTTON_LEFT ) && !measure ) {
 				ms[0] = mpos.x;
-				measure = true;
+				measure = slidem = true;
 			}
 
 			if ( IsMouseButtonDown( MOUSE_BUTTON_RIGHT )) {
@@ -170,7 +185,7 @@ private:
 	Canvas2d m_canvas;
 	Camera2D m_camera;
 	std::list <imgAVG> collect;
-	bool slide, measure;
+	bool slide, measure, slidem;
 	float old_camera_x, mouse_m_x, ms[2];
 };
 
