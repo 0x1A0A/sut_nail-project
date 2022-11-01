@@ -4,8 +4,9 @@
 #include "canvas2d.h"
 #include "rlgl.h"
 #include "raymath.h"
-#include <list>
 #include "utils.h"
+#include <list>
+#include <stdio.h>
 
 class rlGrpah {
 public:
@@ -76,7 +77,7 @@ public:
 		if (autoscroll && activate) m_camera.target.x = last;
 		else {
 			if (mouseIn()) {
-				if ( IsMouseButtonDown( MOUSE_BUTTON_MIDDLE ) && !slide ) {
+				if ( IsMouseButtonPressed( MOUSE_BUTTON_MIDDLE ) && !slide ) {
 					old_camera_x = m_camera.target.x;
 					mouse_m_x = mpos.x;
 					slide = true;
@@ -105,6 +106,7 @@ public:
 
 		if ( measure ) {
 			ms[1] = mpos.x;
+			ms[1] = ms[1] >= 10 ? ms[1] : 10;
 		}
 
 		{
@@ -126,12 +128,12 @@ public:
 
 		if (mouseIn()) {
 
-			if ( IsMouseButtonDown( MOUSE_BUTTON_LEFT ) && !measure ) {
+			if ( IsMouseButtonPressed( MOUSE_BUTTON_LEFT ) && mpos.y > pos.y-150 && mpos.x >= 10 && !measure ) {
 				ms[0] = mpos.x;
 				measure = slidem = true;
 			}
 
-			if ( IsMouseButtonDown( MOUSE_BUTTON_RIGHT )) {
+			if ( IsMouseButtonPressed( MOUSE_BUTTON_RIGHT )) {
 				ms[0] = ms[1] = 10;
 			}
 
