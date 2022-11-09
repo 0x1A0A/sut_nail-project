@@ -7,11 +7,9 @@
 #include "rlgl.h"
 
 #include "canvas2d.h"
-#include "rayvideocap.h"
-#include "raygraph.h"
+#include "video/rayvideocap.h"
+#include "graph/raygraph.h"
 #include "savecsv.h"
-
-bool DONE = false;
 
 int main(int argc, char** argv)
 {	
@@ -136,7 +134,6 @@ int main(int argc, char** argv)
 			EndDrawing();
 		}
 
-		DONE = true;
 	}
 
 	CloseWindow();
