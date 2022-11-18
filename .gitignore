@@ -1,2 +1,4 @@
 .vscode
 cpp/build
+python/env
+python/src/__pycache__
